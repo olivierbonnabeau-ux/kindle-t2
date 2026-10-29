@@ -97,7 +97,8 @@ def build_image(now: datetime) -> tuple[bytes, dict]:
         res = client.get_departures()
         traffic = client.get_traffic()
         plans = compute_all(cfg["people"], res.times, now, int(cfg.get("render", {}).get("next_departures", 4)))
-        img = render.render_screen(plans, res.times, traffic, now, cfg, stale=res.stale)
+        img = render.render_screen(plans, res.times, traffic, now, cfg, stale=res.stale,
+                                   theoretical=res.theoretical_times)
         info.update(stale=res.stale, error=res.error, n_departures=len(res.departures),
                     fetched_at=res.fetched_at.isoformat() if res.fetched_at else None)
         if res.stale:

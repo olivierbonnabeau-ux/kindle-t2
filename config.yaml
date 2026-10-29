@@ -35,6 +35,11 @@ prim:
   cache_s: 30
   timeout_s: 10
   max_departures: 8
+  # L'API temps réel ne renvoie que 2 passages par quai : on complète avec les horaires
+  # théoriques de l'API Navitia de PRIM (même clé) → 2 réels puis les 2 théoriques suivants.
+  navitia_stop_points: ["stop_point:IDFM:23445", "stop_point:IDFM:25647"]
+  navitia_count: 8
+  navitia_cache_s: 120
 
 server:
   host: "0.0.0.0"

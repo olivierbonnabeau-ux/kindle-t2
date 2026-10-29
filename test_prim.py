@@ -58,7 +58,10 @@ def main() -> int:
     for d in res.departures:
         mins = int((d.expected - now).total_seconds() // 60)
         delay = f"  retard +{d.delay_min} min" if d.delay_min > 0 else ""
-        print(f"  {d.expected:%H:%M}  dans {mins:>3} min   → {d.destination}  [quai {d.stop_point}]{delay}")
+        kind = "théorique " if d.theoretical else "temps réel"
+        print(f"  {d.expected:%H:%M}  dans {mins:>3} min   {kind}  → {d.destination[:34]}  [quai {d.stop_point}]{delay}")
+    if client.theo_error:
+        print("  (horaires théoriques indisponibles :", client.theo_error, ")")
 
     traffic = client.get_traffic(force=True)
     print("\nTrafic :", "PERTURBÉ — " + traffic.message if traffic.disrupted else traffic.message,

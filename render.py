@@ -144,7 +144,10 @@ def _wrap(draw, text: str, f, max_w: int, max_lines: int = 2) -> list[str]:
 
 # ---------------------------------------------------------------- écran principal
 def render_screen(plans, departures, traffic, now: datetime, cfg: dict,
-                  stale: bool = False, weather: str | None = None) -> Image.Image:
+                  stale: bool = False, weather: str | None = None,
+                  theoretical: set | None = None) -> Image.Image:
+    """`theoretical` : heures qui viennent des horaires théoriques (affichées en gris)."""
+    theoretical = theoretical or set()
     rc = cfg.get("render", {})
     W, H = int(rc.get("width", 758)), int(rc.get("height", 1024))
     stop = cfg["stop"]
@@ -213,9 +216,11 @@ def render_screen(plans, departures, traffic, now: datetime, cfg: dict,
         slot = (W - 2 * margin) // n
         for i, t in enumerate(nexts):
             cx = margin + i * slot + slot // 2
-            d.text((cx, y), t.strftime("%H:%M"), fill=BLACK, font=font(46, bold=i == 0), anchor="mt")
+            theo = t in theoretical
+            d.text((cx, y), t.strftime("%H:%M"), fill=GREY if theo else BLACK, font=font(46, bold=i == 0), anchor="mt")
             mins = int((t - now).total_seconds() // 60)
-            d.text((cx, y + 62), f"{max(mins, 0)} min", fill=DARK, font=font(24), anchor="mt")
+            d.text((cx, y + 62), f"{max(mins, 0)} min" + (" · théo." if theo else ""),
+                   fill=GREY if theo else DARK, font=font(22 if theo else 24), anchor="mt")
     else:
         d.text((margin, y + 10), "Aucun passage annoncé", fill=DARK, font=font(34))
     y += 104

@@ -16,7 +16,7 @@ import os
 import threading
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -27,6 +27,7 @@ from dotenv import load_dotenv
 HERE = Path(__file__).resolve().parent
 STOP_MONITORING_URL = "https://prim.iledefrance-mobilites.fr/marketplace/stop-monitoring"
 GENERAL_MESSAGE_URL = "https://prim.iledefrance-mobilites.fr/marketplace/general-message"
+NAVITIA_URL = "https://prim.iledefrance-mobilites.fr/marketplace/v2/navitia"
 
 
 def load_config(path: Path | None = None) -> dict:
@@ -51,6 +52,7 @@ class Departure:
     destination: str
     line: str
     stop_point: str
+    theoretical: bool = False   # True = horaire théorique (Navitia), pas de temps réel
 
     @property
     def delay_min(self) -> int:
@@ -69,6 +71,10 @@ class DeparturesResult:
     @property
     def times(self) -> list[datetime]:
         return [d.expected for d in self.departures]
+
+    @property
+    def theoretical_times(self) -> set[datetime]:
+        return {d.expected for d in self.departures if d.theoretical}
 
 
 @dataclass
@@ -111,6 +117,9 @@ class PrimClient:
         self.cache_s = float(prim.get("cache_s", 30))
         self.timeout_s = float(prim.get("timeout_s", 10))
         self.max_departures = int(prim.get("max_departures", 8))
+        self.navitia_stop_points: list[str] = [str(s) for s in prim.get("navitia_stop_points", [])]
+        self.navitia_count = int(prim.get("navitia_count", 8))
+        self.navitia_cache_s = float(prim.get("navitia_cache_s", 120))
         self.tz = ZoneInfo(self.cfg.get("timezone", "Europe/Paris"))
 
         stop = self.cfg["stop"]
@@ -122,6 +131,9 @@ class PrimClient:
         self._last_fetch_mono = 0.0
         self._traffic: TrafficResult = TrafficResult()
         self._traffic_fetch_mono = 0.0
+        self._theo: list[Departure] = []
+        self._theo_fetch_mono = 0.0
+        self.theo_error: str | None = None
 
         self._session = requests.Session()
         self._session.headers.update({"apiKey": self.api_key, "Accept": "application/json"})
@@ -134,6 +146,7 @@ class PrimClient:
                 return self._last
             try:
                 deps = self._fetch_all_departures()
+                deps = self._complete_with_theoretical(deps)
                 self._last = DeparturesResult(departures=deps, fetched_at=datetime.now(self.tz))
             except Exception as e:  # réseau, HTTP, JSON…
                 self._last = DeparturesResult(
@@ -206,6 +219,61 @@ class PrimClient:
                 )
         return out
 
+    # ------------------------------------------------------------------ théorique (Navitia)
+    def _complete_with_theoretical(self, real: list[Departure]) -> list[Departure]:
+        """Garde les passages temps réel, puis ajoute les horaires théoriques qui suivent le
+        dernier passage réel (à plus d'une minute), jusqu'à max_departures."""
+        theo = self._get_theoretical()
+        if not theo:
+            return real
+        last_real = max((d.expected for d in real), default=datetime.now(timezone.utc))
+        cutoff = last_real + timedelta(minutes=1)
+        extra = [d for d in theo if d.expected >= cutoff]
+        merged = sorted(real + extra, key=lambda d: d.expected)
+        return merged[: self.max_departures]
+
+    def _get_theoretical(self) -> list[Departure]:
+        """Horaires théoriques Navitia, cache navitia_cache_s ; en cas d'erreur, on garde les
+        précédents (filtrés sur le futur) et on note l'erreur dans theo_error."""
+        if not self.navitia_stop_points:
+            return []
+        age = time.monotonic() - self._theo_fetch_mono
+        if self._theo_fetch_mono and age < self.navitia_cache_s:
+            pass
+        else:
+            try:
+                self._theo = self._fetch_theoretical()
+                self.theo_error = None
+            except Exception as e:
+                self.theo_error = f"{type(e).__name__}: {e}"
+            self._theo_fetch_mono = time.monotonic()
+        now = datetime.now(timezone.utc)
+        return [d for d in self._theo if d.expected >= now]
+
+    def _fetch_theoretical(self) -> list[Departure]:
+        out: dict[str, Departure] = {}
+        line_code = str(self.cfg["stop"].get("line_name", ""))
+        for sp in self.navitia_stop_points:
+            r = self._session.get(
+                f"{NAVITIA_URL}/stop_points/{sp}/departures",
+                params={"count": self.navitia_count, "data_freshness": "base_schedule",
+                        "from_datetime": datetime.now(self.tz).strftime("%Y%m%dT%H%M%S")},
+                timeout=self.timeout_s,
+            )
+            r.raise_for_status()
+            for dep in r.json().get("departures", []):
+                info = dep.get("display_informations", {})
+                if line_code and info.get("code") != line_code:
+                    continue
+                raw = dep["stop_date_time"]["departure_date_time"]  # ex. 20261029T234500, heure locale
+                t = datetime.strptime(raw, "%Y%m%dT%H%M%S").replace(tzinfo=self.tz)
+                key = t.isoformat()
+                out.setdefault(key, Departure(
+                    expected=t, aimed=t, destination=info.get("direction", ""),
+                    line=info.get("code", ""), stop_point=sp.rsplit(":", 1)[-1], theoretical=True,
+                ))
+        return sorted(out.values(), key=lambda d: d.expected)
+
     # ------------------------------------------------------------------ trafic
     def get_traffic(self, force: bool = False, cache_s: float = 120) -> TrafficResult:
         with self._lock:
@@ -256,4 +324,5 @@ if __name__ == "__main__":  # petit test manuel
     res = c.get_departures()
     print("stale:", res.stale, "error:", res.error)
     for d in res.departures:
-        print(d.expected.strftime("%H:%M"), d.destination, f"(+{d.delay_min} min)" if d.delay_min else "")
+        print(d.expected.strftime("%H:%M"), d.destination, f"(+{d.delay_min} min)" if d.delay_min else "",
+              "[théorique]" if d.theoretical else "[temps réel]")
