@@ -1,0 +1,13 @@
+.env
+__pycache__/
+*.pyc
+cache/
+logs/
+kindle.png
+preview.png
+preview_night.png
+# téléchargements tiers (jailbreak, kindle-dash) : pas dans le dépôt
+jailbreak/download/
+jailbreak/kindle-dash/
+jailbreak/kindle-dash-pw3/
+jailbreak/wb2/

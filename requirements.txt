@@ -1,0 +1,7 @@
+requests
+Pillow
+PyYAML
+python-dotenv
+flask
+tzdata
+gunicorn

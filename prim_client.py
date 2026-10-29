@@ -1,0 +1,259 @@
+"""Client PRIM (Île-de-France Mobilités) : prochains départs du T2 à Pont de Bezons.
+
+- cache mémoire de `prim.cache_s` secondes (30 s par défaut) ;
+- en cas d'erreur réseau / HTTP, on garde la dernière réponse valide et on
+  marque le résultat `stale=True` (l'écran affichera "données indisponibles") ;
+- infos trafic via general-message (optionnel, même mécanique).
+
+Usage :
+    from prim_client import PrimClient
+    c = PrimClient()                   # lit config.yaml + .env
+    r = c.get_departures()             # DeparturesResult
+"""
+from __future__ import annotations
+
+import os
+import threading
+import time
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from pathlib import Path
+from zoneinfo import ZoneInfo
+
+import requests
+import yaml
+from dotenv import load_dotenv
+
+HERE = Path(__file__).resolve().parent
+STOP_MONITORING_URL = "https://prim.iledefrance-mobilites.fr/marketplace/stop-monitoring"
+GENERAL_MESSAGE_URL = "https://prim.iledefrance-mobilites.fr/marketplace/general-message"
+
+
+def load_config(path: Path | None = None) -> dict:
+    with open(path or HERE / "config.yaml", encoding="utf-8") as f:
+        return yaml.safe_load(f)
+
+
+def load_api_key() -> str:
+    load_dotenv(HERE / ".env")
+    key = os.environ.get("PRIM_API_KEY", "").strip()
+    if not key or key == "colle_ta_cle_ici":
+        raise RuntimeError(
+            "Clé PRIM absente : copie .env.example en .env et renseigne PRIM_API_KEY."
+        )
+    return key
+
+
+@dataclass
+class Departure:
+    expected: datetime          # heure de départ attendue (temps réel), tz-aware
+    aimed: datetime | None      # heure théorique
+    destination: str
+    line: str
+    stop_point: str
+
+    @property
+    def delay_min(self) -> int:
+        if not self.aimed:
+            return 0
+        return round((self.expected - self.aimed).total_seconds() / 60)
+
+
+@dataclass
+class DeparturesResult:
+    departures: list[Departure] = field(default_factory=list)
+    fetched_at: datetime | None = None   # heure de la dernière réponse API valide
+    stale: bool = False                  # True si l'API est tombée et qu'on sert l'ancien résultat
+    error: str | None = None             # message de la dernière erreur
+
+    @property
+    def times(self) -> list[datetime]:
+        return [d.expected for d in self.departures]
+
+
+@dataclass
+class TrafficResult:
+    disrupted: bool = False
+    message: str = ""
+    stale: bool = False
+    error: str | None = None
+
+
+def _parse_iso(s: str | None) -> datetime | None:
+    if not s:
+        return None
+    s = s.replace("Z", "+00:00")
+    try:
+        dt = datetime.fromisoformat(s)
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
+def _first_text(value) -> str:
+    """Les champs SIRI arrivent comme [{"value": "..."}] ou comme chaîne."""
+    if isinstance(value, list):
+        if not value:
+            return ""
+        value = value[0]
+    if isinstance(value, dict):
+        return str(value.get("value", ""))
+    return str(value or "")
+
+
+class PrimClient:
+    def __init__(self, config: dict | None = None, api_key: str | None = None):
+        self.cfg = config or load_config()
+        self.api_key = api_key or load_api_key()
+        prim = self.cfg.get("prim", {})
+        self.cache_s = float(prim.get("cache_s", 30))
+        self.timeout_s = float(prim.get("timeout_s", 10))
+        self.max_departures = int(prim.get("max_departures", 8))
+        self.tz = ZoneInfo(self.cfg.get("timezone", "Europe/Paris"))
+
+        stop = self.cfg["stop"]
+        self.stop_point_ids: list[str] = [str(s) for s in stop["stop_point_ids"]]
+        self.line_ref = f"STIF:Line::{stop['line_id']}:"
+
+        self._lock = threading.Lock()
+        self._last: DeparturesResult = DeparturesResult()
+        self._last_fetch_mono = 0.0
+        self._traffic: TrafficResult = TrafficResult()
+        self._traffic_fetch_mono = 0.0
+
+        self._session = requests.Session()
+        self._session.headers.update({"apiKey": self.api_key, "Accept": "application/json"})
+
+    # ------------------------------------------------------------------ départs
+    def get_departures(self, force: bool = False) -> DeparturesResult:
+        with self._lock:
+            age = time.monotonic() - self._last_fetch_mono
+            if not force and self._last.fetched_at and age < self.cache_s:
+                return self._last
+            try:
+                deps = self._fetch_all_departures()
+                self._last = DeparturesResult(departures=deps, fetched_at=datetime.now(self.tz))
+            except Exception as e:  # réseau, HTTP, JSON…
+                self._last = DeparturesResult(
+                    departures=self._last.departures,
+                    fetched_at=self._last.fetched_at,
+                    stale=True,
+                    error=f"{type(e).__name__}: {e}",
+                )
+            self._last_fetch_mono = time.monotonic()
+            return self._last
+
+    def _fetch_all_departures(self) -> list[Departure]:
+        seen: dict[tuple, Departure] = {}
+        errors = []
+        for sp in self.stop_point_ids:
+            try:
+                for d in self._fetch_stop_point(sp):
+                    key = (d.expected.isoformat(), d.destination)
+                    seen.setdefault(key, d)
+            except Exception as e:
+                errors.append(f"{sp}: {type(e).__name__}: {e}")
+        if not seen and errors:
+            raise RuntimeError("; ".join(errors))
+        now = datetime.now(timezone.utc)
+        deps = sorted((d for d in seen.values() if d.expected >= now), key=lambda d: d.expected)
+        return deps[: self.max_departures]
+
+    def _fetch_stop_point(self, stop_point_id: str) -> list[Departure]:
+        r = self._session.get(
+            STOP_MONITORING_URL,
+            params={"MonitoringRef": f"STIF:StopPoint:Q:{stop_point_id}:"},
+            timeout=self.timeout_s,
+        )
+        r.raise_for_status()
+        return self.parse_stop_monitoring(r.json(), stop_point_id)
+
+    def parse_stop_monitoring(self, payload: dict, stop_point_id: str = "") -> list[Departure]:
+        out: list[Departure] = []
+        deliveries = (
+            payload.get("Siri", {}).get("ServiceDelivery", {}).get("StopMonitoringDelivery", [])
+        )
+        for delivery in deliveries:
+            for visit in delivery.get("MonitoredStopVisit", []) or []:
+                mvj = visit.get("MonitoredVehicleJourney", {})
+                line = _first_text(mvj.get("LineRef"))
+                if self.line_ref and line and line != self.line_ref:
+                    continue
+                call = mvj.get("MonitoredCall", {})
+                expected = _parse_iso(
+                    _first_text(call.get("ExpectedDepartureTime"))
+                    or _first_text(call.get("ExpectedArrivalTime"))
+                )
+                if not expected:
+                    continue
+                aimed = _parse_iso(
+                    _first_text(call.get("AimedDepartureTime"))
+                    or _first_text(call.get("AimedArrivalTime"))
+                )
+                dest = _first_text(mvj.get("DestinationName")) or _first_text(
+                    call.get("DestinationDisplay")
+                )
+                out.append(
+                    Departure(
+                        expected=expected.astimezone(self.tz),
+                        aimed=aimed.astimezone(self.tz) if aimed else None,
+                        destination=dest,
+                        line=line,
+                        stop_point=stop_point_id,
+                    )
+                )
+        return out
+
+    # ------------------------------------------------------------------ trafic
+    def get_traffic(self, force: bool = False, cache_s: float = 120) -> TrafficResult:
+        with self._lock:
+            age = time.monotonic() - self._traffic_fetch_mono
+            if not force and self._traffic_fetch_mono and age < cache_s:
+                return self._traffic
+            try:
+                self._traffic = self._fetch_traffic()
+            except Exception as e:
+                self._traffic = TrafficResult(
+                    disrupted=self._traffic.disrupted,
+                    message=self._traffic.message,
+                    stale=True,
+                    error=f"{type(e).__name__}: {e}",
+                )
+            self._traffic_fetch_mono = time.monotonic()
+            return self._traffic
+
+    def _fetch_traffic(self) -> TrafficResult:
+        r = self._session.get(
+            GENERAL_MESSAGE_URL, params={"LineRef": self.line_ref}, timeout=self.timeout_s
+        )
+        r.raise_for_status()
+        return self.parse_general_message(r.json())
+
+    @staticmethod
+    def parse_general_message(payload: dict) -> TrafficResult:
+        msgs: list[str] = []
+        deliveries = (
+            payload.get("Siri", {}).get("ServiceDelivery", {}).get("GeneralMessageDelivery", [])
+        )
+        for delivery in deliveries:
+            for info in delivery.get("InfoMessage", []) or []:
+                content = info.get("Content", {})
+                for m in content.get("Message", []) or []:
+                    txt = _first_text(m.get("MessageText"))
+                    if txt:
+                        msgs.append(" ".join(txt.split()))
+        if not msgs:
+            return TrafficResult(disrupted=False, message="Trafic normal")
+        # message le plus court en premier : plus lisible sur un e-ink
+        msgs.sort(key=len)
+        return TrafficResult(disrupted=True, message=msgs[0])
+
+
+if __name__ == "__main__":  # petit test manuel
+    c = PrimClient()
+    res = c.get_departures()
+    print("stale:", res.stale, "error:", res.error)
+    for d in res.departures:
+        print(d.expected.strftime("%H:%M"), d.destination, f"(+{d.delay_min} min)" if d.delay_min else "")

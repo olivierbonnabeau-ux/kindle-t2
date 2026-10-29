@@ -1,0 +1,44 @@
+# Configuration de l'écran "quand partir" — Pont de Bezons, tram T2
+
+stop:
+  name: "Pont de Bezons"
+  # Identifiants trouvés via l'open data IDFM (dataset arrets-lignes).
+  # Le terminus a deux quais ; on interroge les deux et on fusionne.
+  stop_point_ids: ["23445", "25647"]        # → MonitoringRef=STIF:StopPoint:Q:<id>:
+  line_id: "C01390"                          # T2 → LineRef=STIF:Line::C01390:
+  line_name: "T2"
+  destination: "Porte de Versailles"
+
+people:
+  - name: "Cam"
+    key: "cam"            # sous-dossier dans ./pictos/
+    walk_min: 9
+    margin_min: 1
+  - name: "Oliv"
+    key: "oliv"
+    walk_min: 6
+    margin_min: 1
+
+timezone: "Europe/Paris"
+
+# Plages horaires (heures locales). Le serveur ne régénère jamais l'image plus
+# souvent que min_regen_s, quelle que soit la fréquence des requêtes.
+schedule:
+  min_regen_s: 30
+  active:   { start: "06:00", end: "10:00", refresh_s: 60 }    # heures de pointe
+  normal:   { refresh_s: 300 }                                  # le reste de la journée
+  night:    { start: "23:00", end: "06:00", refresh_s: 1800 }  # écran nuit, pas d'appel API
+
+prim:
+  cache_s: 30
+  timeout_s: 10
+  max_departures: 8
+
+server:
+  host: "0.0.0.0"
+  port: 8080
+
+render:
+  width: 758
+  height: 1024
+  next_departures: 4

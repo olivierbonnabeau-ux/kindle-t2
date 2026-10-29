@@ -1,0 +1,22 @@
+#!/bin/sh
+# Wrapper autour du binaire next-wakeup de kindle-dash (renommé next-wakeup.bin).
+# dash.sh l'appelle ainsi : next-wakeup --schedule="..." --timezone="Europe/Paris"
+# On calcule le prochain réveil pour deux horaires et on garde le plus proche :
+#   PEAK_SCHEDULE (heures de pointe, toutes les minutes) et REFRESH_SCHEDULE (le reste).
+DIR="$(dirname "$0")"
+TZ_OPT="--timezone=Europe/Paris"
+SCHED_OPT=""
+for a in "$@"; do
+  case "$a" in
+    --timezone=*) TZ_OPT="$a" ;;
+    --schedule=*) SCHED_OPT="$a" ;;
+  esac
+done
+SLOW="${REFRESH_SCHEDULE:-${SCHED_OPT#--schedule=}}"
+FAST="${PEAK_SCHEDULE:-$SLOW}"
+a=$("$DIR/next-wakeup.bin" --schedule="$FAST" "$TZ_OPT" 2>/dev/null)
+b=$("$DIR/next-wakeup.bin" --schedule="$SLOW" "$TZ_OPT" 2>/dev/null)
+[ -z "$a" ] && a=$b
+[ -z "$b" ] && b=$a
+if [ -z "$a" ]; then echo 600; exit 0; fi
+if [ "$a" -lt "$b" ]; then echo "$a"; else echo "$b"; fi
