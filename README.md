@@ -110,17 +110,18 @@ netsh advfirewall firewall add rule name="Kindle T2" dir=in action=allow protoco
 Affichage par **kindle-dash**, fork Paperwhite [pusi77/kindle-dash-pw3](https://github.com/pusi77/kindle-dash-pw3)
 (même plateforme Wario que le PW2). Installé dans `/mnt/us/dashboard` avec nos réglages depuis `kindle/` :
 
-- `kindle/dashboard/local/env.sh` : URL de l'image (Render) et horaires de réveil : **toutes les minutes de 5h30 à 9h59**,
-  toutes les 10 min jusqu'à 0h50 (1h50 les nuits de vendredi et samedi), puis écran nuit jusqu'à 5h30.
-  Plusieurs expressions cron (`EXTRA_SCHEDULES`) combinées par le wrapper `kindle/dashboard/next-wakeup`.
+- `kindle/dashboard/local/env.sh` : URL de l'image (Render) et rythme. **Mode continu en service** (`FIXED_INTERVAL_S=10`) :
+  un cycle télécharger + afficher + pause toutes les ~20 s, jour et nuit, sans veille — prévu pour un Kindle sur chargeur
+  (sur batterie, le Wi-Fi est coupé entre deux cycles et chaque reconnexion ajoute ~20 s).
+  Pour revenir aux horaires (chaque minute 5h30–9h59, toutes les 10 min jusqu'à 0h50 / 1h50 le week-end, nuit ensuite) :
+  commenter `FIXED_INTERVAL_S` ; les expressions cron (`EXTRA_SCHEDULES`) sont combinées par le wrapper `kindle/dashboard/next-wakeup`.
 - `kindle/dashboard/local/fetch-dashboard.sh` : curl avec délais larges ; si le magasin de certificats du Kindle
   refuse le certificat, second essai avec `kindle/dashboard/cacert.pem` (bundle Mozilla, vérification TLS conservée).
 - `kindle/documents/*.sh` : scriptlets visibles comme des livres dans la bibliothèque.
 - `kindle/copier_dashboard.ps1` : (ré)installe tout sur le Kindle branché en USB (release extraite dans `jailbreak/kindle-dash-pw3/`).
 
-Utilisation :
+Utilisation (un seul « livre » dans la bibliothèque) :
 
-- **« Tableau de bord T2 - Test »** : une seule récupération + affichage, l'interface Kindle reste. Log : `dashboard/logs/test.log`.
 - **« Tableau de bord T2 - Démarrer »** : lance la boucle (interface Kindle coupée, veille profonde entre deux réveils). Log : `dashboard/logs/dash.log`, batterie : `dashboard/battery.log`.
 - Changer les horaires de réveil ou l'écran nuit = modifier `kindle/`, puis `kindle/copier_dashboard.ps1` avec le Kindle en USB.
 - **Arrêter** : maintenir le bouton d'allumage ~40 s (redémarrage, rien ne se relance tout seul), ou créer un fichier `dashboard/STOP`.

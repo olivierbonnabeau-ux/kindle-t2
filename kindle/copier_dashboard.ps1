@@ -22,11 +22,16 @@ Move-Item -Path (Join-Path $dst "next-wakeup") -Destination (Join-Path $dst "nex
 Copy-Item -Path (Join-Path $PSScriptRoot "dashboard\*") -Destination $dst -Recurse -Force
 # 4) scriptlets en français dans documents (ceux du fork, en anglais, ne sont pas copiés)
 Copy-Item -Path (Join-Path $PSScriptRoot "documents\*.sh") -Destination (Join-Path $root "documents") -Force
-# 5) jamais de fichier STOP résiduel
+# 5) nettoyage : ancien scriptlet Test (affiche une fois puis rend la main, inutile) et son dossier .sdr
+Remove-Item -Path (Join-Path $root "documents\Tableau de bord T2 - Test.sh") -Force -ErrorAction SilentlyContinue
+Remove-Item -Path (Join-Path $root "documents\Tableau de bord T2 - Test.sdr") -Recurse -Force -ErrorAction SilentlyContinue
+Remove-Item -Path (Join-Path $root "documents\Dashboard Test.sh") -Force -ErrorAction SilentlyContinue
+Remove-Item -Path (Join-Path $root "documents\Start Dashboard.sh") -Force -ErrorAction SilentlyContinue
+# 6) jamais de fichier STOP résiduel
 Remove-Item -Path (Join-Path $dst "STOP") -Force -ErrorAction SilentlyContinue
 
 Write-Host "`nContenu de $dst :"
 Get-ChildItem -Path $dst -Recurse -File | ForEach-Object { "  " + $_.FullName.Substring($dst.Length) + "  (" + $_.Length + " o)" }
 Write-Host "`nScriptlets :"
 Get-ChildItem (Join-Path $root "documents") -Filter "Tableau*.sh" | ForEach-Object { "  " + $_.Name }
-Write-Host "`nOK. Éjecte le Kindle, débranche-le, puis ouvre « Tableau de bord T2 - Test » dans la bibliothèque."
+Write-Host "`nOK. Éjecte le Kindle, débranche-le, redémarre-le si besoin, puis ouvre « Tableau de bord T2 - Démarrer » dans la bibliothèque."

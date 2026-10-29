@@ -21,9 +21,18 @@ REFRESH_SCHEDULE="*/10 6-23 * * *"
 #   "*/10 1 * * SAT,SUN"  : idem de 1h00 à 1h50 les nuits de vendredi et samedi (dernier T2 ~1h30)
 EXTRA_SCHEDULES="30-59 5 * * *;* 6-9 * * *;*/10 0 * * *;*/10 1 * * SAT,SUN"
 
+# MODE CONTINU : si FIXED_INTERVAL_S est défini, les horaires ci-dessus sont ignorés et le Kindle
+# recommence un cycle (téléchargement + affichage + pause) toutes les ~FIXED_INTERVAL_S + 10 s,
+# sans jamais se mettre en veille. Avec 10 → un rafraîchissement toutes les ~20 s, jour et nuit
+# (la nuit, c'est le serveur qui envoie l'écran "Bonne nuit" avec l'heure).
+# Prévu pour un Kindle branché sur un chargeur : sur batterie, le Wi-Fi est coupé entre deux
+# cycles et chaque reconnexion ajoute ~20 s. Mettre la ligne en commentaire pour revenir aux horaires.
+FIXED_INTERVAL_S=10
+
 # Au-delà de ce délai (s) avant le prochain réveil, on affiche sleeping.png au lieu de rafraîchir
-# (après 0h50, ou 1h50 le week-end, le prochain réveil est 5h30 → écran nuit).
+# (horaires seulement : après 0h50, ou 1h50 le week-end, le prochain réveil est 5h30 → écran nuit).
 SLEEP_SCREEN_INTERVAL=660
 
 # Rafraîchissement complet (flash) une fois sur N, les autres sont partiels (sans flash).
-FULL_DISPLAY_REFRESH_RATE=6
+# En mode continu 20 s, 15 → un flash toutes les ~5 min pour effacer les traces.
+FULL_DISPLAY_REFRESH_RATE=15

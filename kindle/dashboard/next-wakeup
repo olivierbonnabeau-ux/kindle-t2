@@ -4,6 +4,11 @@
 # On calcule le prochain réveil pour chaque horaire (celui passé en argument + EXTRA_SCHEDULES,
 # séparés par ";") et on renvoie le plus proche.
 DIR="$(dirname "$0")"
+# Mode continu : intervalle fixe, horaires ignorés (voir local/env.sh).
+case "$FIXED_INTERVAL_S" in
+  "" | *[!0-9]*) ;;
+  *) echo "$FIXED_INTERVAL_S"; exit 0 ;;
+esac
 TZ_OPT="--timezone=Europe/Paris"
 SCHED=""
 for a in "$@"; do
