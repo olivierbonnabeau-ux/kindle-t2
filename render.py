@@ -200,7 +200,7 @@ def render_screen(plans, departures, traffic, now: datetime, cfg: dict,
         slot = (W - 2 * margin) // n
         for i, t in enumerate(nexts):
             cx = margin + i * slot + slot // 2
-            d.text((cx, y), t.strftime("%H:%M"), fill=BLACK, font=font(52, bold=i == 0), anchor="mt")
+            d.text((cx, y), t.strftime("%H:%M"), fill=BLACK, font=font(46, bold=i == 0), anchor="mt")
             mins = int((t - now).total_seconds() // 60)
             d.text((cx, y + 62), f"{max(mins, 0)} min", fill=DARK, font=font(24), anchor="mt")
     else:
