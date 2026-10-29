@@ -54,9 +54,14 @@ def font(size: int, bold: bool = False) -> ImageFont.ImageFont:
 
 
 # ---------------------------------------------------------------- pictos
-def pick_picto(person_key: str, day: datetime, weather: str | None = None) -> Path | None:
-    """Un picto différent chaque jour ; si `weather` est donné, on préfère un
-    fichier dont le nom contient ce mot (ex. "pluie", "soleil")."""
+_rotation: dict[str, tuple[str, int]] = {}   # personne → (clé du tram visé, index du picto)
+
+
+def pick_picto(person_key: str, seed: str, weather: str | None = None) -> Path | None:
+    """Le picto change à chaque nouveau tram visé (`seed` = heure du tram, ou la date
+    si aucun tram) : on avance d'un cran dans la liste à chaque changement, sans répéter
+    deux fois de suite le même. Si `weather` est donné, on préfère les fichiers dont le
+    nom contient ce mot (ex. "pluie", "soleil")."""
     folder = PICTOS / person_key
     if not folder.is_dir():
         return None
@@ -68,9 +73,16 @@ def pick_picto(person_key: str, day: datetime, weather: str | None = None) -> Pa
         matching = [p for p in files if w in p.stem.lower()]
         if matching:
             files = matching
-    # hash stable de (personne, date) → même picto toute la journée, change le lendemain
-    h = int(hashlib.md5(f"{person_key}:{day:%Y-%m-%d}".encode()).hexdigest(), 16)
-    return files[h % len(files)]
+    last = _rotation.get(person_key)
+    if last is None:
+        # premier affichage (démarrage du serveur) : point de départ dérivé du seed
+        idx = int(hashlib.md5(f"{person_key}:{seed}".encode()).hexdigest(), 16) % len(files)
+    elif last[0] != seed:
+        idx = (last[1] + 1) % len(files)      # nouveau tram → picto suivant
+    else:
+        idx = last[1]                         # même tram → même picto
+    _rotation[person_key] = (seed, idx)
+    return files[idx]
 
 
 def load_picto(path: Path | None, size: int, fallback_initial: str) -> Image.Image:
@@ -158,7 +170,8 @@ def render_screen(plans, departures, traffic, now: datetime, cfg: dict,
         x0 = margin + i * col_w
         cx = x0 + col_w // 2
         pkey = people_cfg.get(plan.name, {}).get("key", plan.name.lower())
-        picto = load_picto(pick_picto(pkey, now, weather), 190, plan.name[:1])
+        seed = plan.target_tram.isoformat() if plan.target_tram else now.strftime("%Y-%m-%d")
+        picto = load_picto(pick_picto(pkey, seed, weather), 190, plan.name[:1])
         img.paste(picto, (cx - 95, col_top))
         d.text((cx, col_top + 215), plan.name, fill=BLACK, font=font(36, bold=True), anchor="mt")
 

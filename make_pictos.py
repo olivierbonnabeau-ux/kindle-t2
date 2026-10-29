@@ -453,8 +453,8 @@ def build(selection: dict[str, list[str]]):
 
 # Pictos retenus (décision d'Olivier, 29/10/2026) : un au hasard par jour (voir render.pick_picto)
 SELECTION = {
-    "cam": ["sourire", "clin d'œil", "café", "musique"],
-    "oliv": ["classique"],   # en attente du choix "cheveux en pétard"
+    "cam": ["sourire", "clin d'œil", "café", "musique"],                         # planche 1 : 2, 3, 14, 16
+    "oliv": ["classique", "sans lunettes", "clin d'œil", "pics", "réveil", "surprise"],  # planche 1 : 1, 2, 3, 5, 13, 15
 }
 
 if __name__ == "__main__":
