@@ -57,9 +57,27 @@ Plages horaires (`config.yaml` → `schedule`) : 6h–10h rafraîchissement cons
 reste de la journée 5 min, 23h–6h écran « nuit » (heure + lune, aucun appel API).
 Le délai conseillé est renvoyé dans l'en-tête HTTP `X-Refresh-Seconds`.
 
-## 5. Démarrage automatique
+## 4 bis. Hébergement cloud (Render) — la solution en service
 
-**Déjà en place (29/10/2026)** : un raccourci « Kindle T2 » dans le dossier Démarrage de la session
+Pour que le Kindle ne dépende pas d'un PC allumé, le serveur tourne sur **Render** :
+
+- Service web `kindle-t2`, plan gratuit, région Francfort, déployé depuis le dépôt GitHub privé
+  `olivierbonnabeau-ux/kindle-t2` (branche `main`, redéploiement automatique à chaque push).
+- URL : **https://kindle-t2.onrender.com/kindle.png** (et `/health`, `/`).
+- Commande de démarrage : `gunicorn -w 1 --threads 4 --timeout 60 -b 0.0.0.0:$PORT server:app`.
+- La clé PRIM est dans la variable d'environnement `PRIM_API_KEY` du service (jamais dans le dépôt).
+- Tableau de bord : https://dashboard.render.com/web/srv-dbhs0e67bikc73fpkong
+
+Plan gratuit : le service s'endort après 15 min sans requête et met 30 à 60 s à se réveiller.
+Avec un réveil du Kindle toutes les 10 min au plus, il reste chaud toute la journée ; seule la
+première requête du matin (6h00) est lente, d'où les délais larges dans `kindle/dashboard/local/fetch-dashboard.sh`.
+
+Pour modifier le visuel : éditer `render.py`, puis `git commit` + `git push` → Render redéploie en ~1 min.
+Le serveur local sur PC_Olivier (sections 4 et 5) reste un secours.
+
+## 5. Démarrage automatique du serveur local (secours)
+
+**En place (29/10/2026)** : un raccourci « Kindle T2 » dans le dossier Démarrage de la session
 (`%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\Kindle T2.lnk`) lance `run.bat` en fenêtre
 réduite à chaque ouverture de session, sans droits administrateur. Pour le retirer : supprimer le raccourci
 (touche Windows + R, `shell:startup`). Pour l'arrêter sans le retirer : fermer la fenêtre « cmd » réduite
@@ -91,8 +109,10 @@ netsh advfirewall firewall add rule name="Kindle T2" dir=in action=allow protoco
 Affichage par **kindle-dash**, fork Paperwhite [pusi77/kindle-dash-pw3](https://github.com/pusi77/kindle-dash-pw3)
 (même plateforme Wario que le PW2). Installé dans `/mnt/us/dashboard` avec nos réglages depuis `kindle/` :
 
-- `kindle/dashboard/local/env.sh` : URL de l'image, toutes les 10 min de 6h à 22h50, **toutes les minutes de 6h à 9h59**
+- `kindle/dashboard/local/env.sh` : URL de l'image (Render), toutes les 10 min de 6h à 22h50, **toutes les minutes de 6h à 9h59**
   (`PEAK_SCHEDULE`, combiné par le wrapper `kindle/dashboard/next-wakeup`), écran nuit ensuite.
+- `kindle/dashboard/local/fetch-dashboard.sh` : curl avec délais larges ; si le magasin de certificats du Kindle
+  refuse le certificat, second essai avec `kindle/dashboard/cacert.pem` (bundle Mozilla, vérification TLS conservée).
 - `kindle/documents/*.sh` : scriptlets visibles comme des livres dans la bibliothèque.
 - `kindle/copier_dashboard.ps1` : (ré)installe tout sur le Kindle branché en USB (release extraite dans `jailbreak/kindle-dash-pw3/`).
 

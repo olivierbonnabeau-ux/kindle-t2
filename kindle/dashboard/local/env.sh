@@ -3,9 +3,9 @@
 # Réglages du tableau de bord "quand partir" (Pont de Bezons · T2), lus par dash.sh au démarrage.
 # Modifiable par USB (D:\dashboard\local\env.sh) ; pris en compte au prochain "Démarrer".
 
-# Image générée par PC_Olivier (serveur kindle-t2, port 8080). Si l'IP de PC_Olivier change,
-# c'est ici qu'on la corrige (mieux : réservation DHCP dans la box pour PC_Olivier).
-DASH_URL="http://192.168.1.6:8080/kindle.png"
+# Image générée par le serveur hébergé sur Render (kindle-t2.onrender.com), indépendant de PC_Olivier.
+# Secours local si besoin : http://192.168.1.6:8080/kindle.png (PC_Olivier allumé, NordVPN déconnecté).
+DASH_URL="https://kindle-t2.onrender.com/kindle.png"
 
 # Rythme de base : toutes les 10 min de 6h à 22h50, puis écran nuit jusqu'à 6h.
 INTERVAL_MINUTES=10
