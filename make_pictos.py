@@ -609,7 +609,7 @@ def build(selection: dict[str, list[str]]):
         folder.mkdir(parents=True, exist_ok=True)
         for old in folder.glob("*.png"):
             old.unlink()
-        lookup = dict(VARIANTS[key])
+        lookup = dict(ALL[key])
         for n in names:
             face(**lookup[n]).save(folder / f"{n.replace(' ', '_').replace(chr(39), '')}.png")
             print("écrit", folder / n)
@@ -617,8 +617,17 @@ def build(selection: dict[str, list[str]]):
 
 # Pictos retenus (décision d'Olivier, 29/10/2026) : un au hasard par jour (voir render.pick_picto)
 SELECTION = {
-    "cam": ["sourire", "clin d'œil", "café", "musique"],                         # planche 1 : 2, 3, 14, 16
-    "oliv": ["classique", "sans lunettes", "clin d'œil", "pics", "réveil", "surprise"],  # planche 1 : 1, 2, 3, 5, 13, 15
+    "cam": ["sourire", "clin d'œil", "café", "musique"]                           # planche 1 : 2, 3, 14, 16
+    + ["rire", "yeux en cœur", "étoiles", "grognon", "perplexe", "triste", "sifflote",
+       "en retard", "reine", "bandana", "au téléphone", "étoile filante"],         # série 3 : tous sauf 8, 10, 13, 14, 15, 16
+    "oliv": ["classique", "sans lunettes", "clin d'œil", "pics", "réveil", "surprise"]  # planche 1 : 1, 2, 3, 5, 13, 15
+    + ["rire", "yeux en cœur", "étoiles", "grognon", "perplexe", "sifflote", "nœud papillon"],  # série 3 : 1 à 6 et 8
+}
+
+# Toutes les variantes connues, par personne (les noms doivent rester uniques dans chaque liste)
+ALL = {
+    "cam": VARIANTS["cam"] + CAM2 + CAM3,
+    "oliv": VARIANTS["oliv"] + PETARD + OLIV3,
 }
 
 if __name__ == "__main__":
