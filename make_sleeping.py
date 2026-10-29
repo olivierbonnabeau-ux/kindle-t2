@@ -21,7 +21,7 @@ def main():
     d.ellipse((cx - 90, cy - 90, cx + 90, cy + 90), fill=BLACK)
     d.ellipse((cx - 30, cy - 115, cx + 125, cy + 40), fill=WHITE)  # croissant
     d.text((cx, cy + 170), "Bonne nuit", fill=BLACK, font=font(64, bold=True), anchor="mt")
-    d.text((cx, cy + 260), f"Horaires à partir de {cfg['schedule']['night']['end']}", fill=DARK, font=font(30), anchor="mt")
+    d.text((cx, cy + 260), f"Premier tram vers {cfg['schedule']['night']['end']}", fill=DARK, font=font(30), anchor="mt")
     d.text((cx, H - 60), "Le Kindle se réveillera tout seul", fill=GREY, font=font(22), anchor="mt")
     out = HERE / "kindle" / "dashboard" / "sleeping.png"
     out.parent.mkdir(parents=True, exist_ok=True)

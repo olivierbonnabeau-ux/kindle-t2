@@ -219,6 +219,15 @@ class PrimClient:
                 )
         return out
 
+    def get_first_departure_after(self, when: datetime) -> Departure | None:
+        """Premier départ théorique à partir de `when` (écran nuit : premier tram du matin)."""
+        with self._lock:
+            theo = self._get_theoretical()
+        for d in theo:
+            if d.expected >= when:
+                return d
+        return None
+
     # ------------------------------------------------------------------ théorique (Navitia)
     def _complete_with_theoretical(self, real: list[Departure]) -> list[Departure]:
         """Garde les passages temps réel, puis ajoute les horaires théoriques qui suivent le

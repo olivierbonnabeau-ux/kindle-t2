@@ -87,7 +87,16 @@ def build_image(now: datetime) -> tuple[bytes, dict]:
     mode, refresh = current_mode(now)
     info = {"mode": mode, "refresh_s": refresh, "stale": False, "error": None, "n_departures": 0}
     if mode == "night":
-        img = render.render_night(now, cfg, next_active=SCHED.get("night", {}).get("end", "06:00"))
+        first = None
+        if client is not None:
+            try:
+                dep = client.get_first_departure_after(now)   # horaires théoriques, cache 120 s
+                first = dep.expected if dep else None
+            except Exception as e:  # jamais bloquer l'écran nuit
+                log.warning("premier tram indisponible : %s", e)
+        img = render.render_night(now, cfg, next_active=SCHED.get("night", {}).get("end", "06:00"),
+                                  first_tram=first)
+        info["first_tram"] = first.isoformat() if first else None
     elif client is None:
         res = DeparturesResult(stale=True, error=_client_error)
         plans = compute_all(cfg["people"], [], now)

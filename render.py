@@ -10,7 +10,7 @@ Segoe UI / Arial / Verdana (Windows), sinon police bitmap Pillow.
 from __future__ import annotations
 
 import hashlib
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont, ImageOps
@@ -250,18 +250,38 @@ def render_screen(plans, departures, traffic, now: datetime, cfg: dict,
 
 
 # ---------------------------------------------------------------- écran nuit
-def render_night(now: datetime, cfg: dict, next_active: str = "06:00") -> Image.Image:
+def render_night(now: datetime, cfg: dict, next_active: str = "06:00",
+                 first_tram: datetime | None = None) -> Image.Image:
+    """Écran nuit : heure, date, lune, et le premier tram du matin avec l'heure de départ
+    de chacun (first_tram vient des horaires théoriques ; sinon on affiche next_active)."""
     rc = cfg.get("render", {})
     W, H = int(rc.get("width", 758)), int(rc.get("height", 1024))
     img = Image.new("L", (W, H), WHITE)
     d = ImageDraw.Draw(img)
     stop = cfg["stop"]
-    d.text((W // 2, 120), f"{stop['name']} · {stop['line_name']}", fill=DARK, font=font(36, bold=True), anchor="mt")
-    d.text((W // 2, H // 2 - 120), now.strftime("%H:%M"), fill=BLACK, font=font(160, bold=True), anchor="mm")
-    d.text((W // 2, H // 2 + 20), date_fr(now), fill=DARK, font=font(30), anchor="mm")
-    d.ellipse((W // 2 - 40, H // 2 + 90, W // 2 + 40, H // 2 + 170), fill=BLACK)
-    d.ellipse((W // 2 - 10, H // 2 + 78, W // 2 + 60, H // 2 + 150), fill=WHITE)  # croissant de lune
-    d.text((W // 2, H - 140), f"Bonne nuit — horaires à partir de {next_active}", fill=GREY, font=font(24), anchor="mm")
+    cx = W // 2
+    d.text((cx, 90), f"{stop['name']} · {stop['line_name']}", fill=DARK, font=font(36, bold=True), anchor="mt")
+    d.text((cx, 330), now.strftime("%H:%M"), fill=BLACK, font=font(160, bold=True), anchor="mm")
+    d.text((cx, 445), date_fr(now), fill=DARK, font=font(30), anchor="mm")
+    # croissant de lune
+    d.ellipse((cx - 40, 500, cx + 40, 580), fill=BLACK)
+    d.ellipse((cx - 10, 488, cx + 60, 560), fill=WHITE)
+    # premier tram du matin
+    y = 640
+    d.line((60, y, W - 60, y), fill=GREY, width=2)
+    if first_tram:
+        d.text((cx, y + 28), "Premier tram du matin", fill=DARK, font=font(28), anchor="mt")
+        d.text((cx, y + 70), first_tram.strftime("%H:%M"), fill=BLACK, font=font(96, bold=True), anchor="mt")
+        d.text((cx, y + 190), f"→ {stop['destination']}", fill=DARK, font=font(24), anchor="mt")
+        # heure de départ de chacun pour l'attraper
+        parts = []
+        for p in cfg.get("people", []):
+            leave = first_tram - timedelta(minutes=int(p["walk_min"]) + int(p.get("margin_min", 0)))
+            parts.append(f"{p['name']} part à {leave:%H:%M}")
+        d.text((cx, y + 240), "  ·  ".join(parts), fill=BLACK, font=font(30, bold=True), anchor="mt")
+    else:
+        d.text((cx, y + 40), f"Horaires à partir de {next_active}", fill=DARK, font=font(32), anchor="mt")
+    d.text((cx, H - 50), "Bonne nuit", fill=GREY, font=font(24), anchor="mm")
     return img
 
 
