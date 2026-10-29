@@ -163,6 +163,36 @@ def face(hair="short", eyes="open", mouth="smile", glasses=None, hat=None, extra
         d.ellipse((c + 12, ey - 12, c + 36, ey + 12), outline=B, width=5)
         d.ellipse((c - 28, ey - 4, c - 20, ey + 4), fill=B)
         d.ellipse((c + 20, ey - 4, c + 28, ey + 4), fill=B)
+    elif eyes == "hearts":
+        for x in (c - 24, c + 24):
+            d.ellipse((x - 14, ey - 12, x, ey + 2), fill=B)
+            d.ellipse((x, ey - 12, x + 14, ey + 2), fill=B)
+            d.polygon([(x - 13, ey - 2), (x + 13, ey - 2), (x, ey + 14)], fill=B)
+    elif eyes == "stars":
+        for x in (c - 24, c + 24):
+            pts = []
+            for i in range(10):
+                r = 14 if i % 2 == 0 else 6
+                a = -math.pi / 2 + i * math.pi / 5
+                pts.append((x + r * math.cos(a), ey + r * math.sin(a)))
+            d.polygon(pts, fill=B)
+    elif eyes == "angry":
+        d.ellipse((c - 32, ey - 6, c - 16, ey + 10), fill=B)
+        d.ellipse((c + 16, ey - 6, c + 32, ey + 10), fill=B)
+        d.line((c - 40, ey - 22, c - 12, ey - 12), fill=B, width=6)
+        d.line((c + 12, ey - 12, c + 40, ey - 22), fill=B, width=6)
+    elif eyes == "raised":  # sourcil levé, perplexe
+        d.ellipse((c - 32, ey - 8, c - 16, ey + 8), fill=B)
+        d.ellipse((c + 16, ey - 8, c + 32, ey + 8), fill=B)
+        d.arc((c - 42, ey - 30, c - 6, ey - 10), 200, 340, fill=B, width=5)
+        d.line((c + 12, ey - 18, c + 38, ey - 18), fill=B, width=5)
+    elif eyes == "happy":  # yeux plissés de rire ^^
+        d.arc((c - 38, ey - 6, c - 10, ey + 14), 200, 340, fill=B, width=6)
+        d.arc((c + 10, ey - 6, c + 38, ey + 14), 200, 340, fill=B, width=6)
+    elif eyes == "patch":  # bandeau de pirate
+        d.ellipse((c - 32, ey - 8, c - 16, ey + 8), fill=B)
+        d.ellipse((c + 8, ey - 16, c + 40, ey + 16), fill=B)
+        d.line((c - 70, ey - 34, c + 70, ey - 4), fill=B, width=5)
     # ---- bouche
     my = c + 22
     if mouth == "smile":
@@ -178,6 +208,18 @@ def face(hair="short", eyes="open", mouth="smile", glasses=None, hat=None, extra
         d.ellipse((c - 18, my - 2, c + 18, my + 34), fill=B)
     elif mouth == "smirk":
         d.arc((c - 10, my - 12, c + 34, my + 28), 20, 150, fill=B, width=5)
+    elif mouth == "laugh":  # grand rire, dents
+        d.chord((c - 34, my - 10, c + 34, my + 36), 0, 180, fill=B)
+        d.rectangle((c - 28, my + 2, c + 28, my + 12), fill=W)
+    elif mouth == "whistle":
+        d.ellipse((c + 4, my + 6, c + 20, my + 22), outline=B, width=5)
+        for i, dx in enumerate((34, 46)):
+            d.text((c + dx, my + 2 - i * 12), "♪", fill=B, font=font(26 + i * 6, bold=True), anchor="mm")
+    elif mouth == "sad":
+        d.arc((c - 26, my + 12, c + 26, my + 44), 190, 350, fill=B, width=5)
+    elif mouth == "wavy":  # bouche en vague (gêné)
+        for i, x in enumerate(range(c - 24, c + 24, 12)):
+            d.arc((x, my + 4, x + 12, my + 16), 180 if i % 2 == 0 else 0, 360 if i % 2 == 0 else 180, fill=B, width=4)
     # ---- lunettes
     if glasses == "round":
         d.ellipse((c - 42, ey - 18, c - 6, ey + 18), outline=B, width=4)
@@ -251,6 +293,45 @@ def face(hair="short", eyes="open", mouth="smile", glasses=None, hat=None, extra
         d.ellipse((c - 92, c - 100, c + 92, c + 84), fill=B)
         d.ellipse((c - 70, c - 70, c + 70, c + 70), outline=B, width=6, fill=W)
         d.ellipse((c - 70, c - 70, c + 70, c + 70), outline=B, width=6)
+    elif hat == "party":  # chapeau de fête pointu
+        d.polygon([(c - 36, c - 58), (c + 36, c - 58), (c + 10, c - 150)], fill=B)
+        for y in (-80, -104):
+            d.line((c + (y + 58) * -0.35 - 22, c + y, c + (y + 58) * -0.35 + 20, c + y), fill=W, width=4)
+        d.ellipse((c + 2, c - 160, c + 18, c - 144), fill=B)
+    elif hat == "crown":
+        d.polygon([(c - 62, c - 58), (c + 62, c - 58), (c + 62, c - 110), (c + 34, c - 84), (c + 2, c - 120),
+                   (c - 30, c - 84), (c - 62, c - 110)], fill=B)
+        for x in (c - 36, c + 2, c + 40):
+            d.ellipse((x - 5, c - 76, x + 5, c - 66), fill=W)
+    elif hat == "bandana":
+        d.chord((c - 72, c - 80, c + 72, c - 10), 180, 360, fill=B)
+        d.rounded_rectangle((c - 74, c - 68, c + 74, c - 48), radius=6, fill=B)
+        d.polygon([(c + 60, c - 60), (c + 100, c - 40), (c + 96, c - 70), (c + 80, c - 80)], fill=B)
+        for x in range(-56, 60, 18):
+            d.ellipse((c + x - 3, c - 61, c + x + 3, c - 55), fill=W)
+    elif hat == "chef":
+        d.rectangle((c - 50, c - 100, c + 50, c - 56), fill=B)
+        d.ellipse((c - 64, c - 140, c - 10, c - 86), fill=B)
+        d.ellipse((c - 30, c - 150, c + 30, c - 90), fill=B)
+        d.ellipse((c + 10, c - 140, c + 64, c - 86), fill=B)
+        d.rounded_rectangle((c - 54, c - 72, c + 54, c - 56), radius=4, outline=B, width=4, fill=W)
+    elif hat == "pirate":
+        d.chord((c - 90, c - 120, c + 90, c - 30), 180, 360, fill=B)
+        d.polygon([(c - 100, c - 60), (c + 100, c - 60), (c + 80, c - 74), (c - 80, c - 74)], fill=B)
+        d.ellipse((c - 12, c - 104, c + 12, c - 80), fill=W)
+        d.line((c - 16, c - 78, c + 16, c - 66), fill=W, width=4)
+        d.line((c + 16, c - 78, c - 16, c - 66), fill=W, width=4)
+    elif hat == "halo":
+        d.ellipse((c - 50, c - 99, c + 50, c - 79), outline=B, width=7)
+    elif hat == "horns":
+        for side in (-1, 1):
+            x = c + side * 48
+            d.polygon([(x - 14, c - 54), (x + side * 10, c - 108), (x + 14, c - 58)], fill=B)
+    elif hat == "graduate":  # toque de diplômé
+        d.polygon([(c - 90, c - 80), (c, c - 112), (c + 90, c - 80), (c, c - 48)], fill=B)
+        d.rounded_rectangle((c - 52, c - 76, c + 52, c - 50), radius=6, fill=B)
+        d.line((c + 90, c - 80, c + 96, c - 40), fill=B, width=4)
+        d.ellipse((c + 90, c - 44, c + 102, c - 32), fill=B)
     elif hat == "helmet":  # casque vélo
         d.chord((c - 78, c - 118, c + 78, c - 10), 180, 360, fill=B)
         for x in (-40, -14, 12, 38):
@@ -303,6 +384,41 @@ def face(hair="short", eyes="open", mouth="smile", glasses=None, hat=None, extra
     elif extra == "tongue":
         d.chord((c - 10, c + 30, c + 14, c + 58), 0, 180, fill=B)
         d.ellipse((c - 8, c + 36, c + 12, c + 56), fill=B)
+    elif extra == "mustache":
+        for side in (-1, 1):
+            d.chord((c + side * 22 - 24, c + 8, c + side * 22 + 24, c + 32), 180, 360, fill=B)
+        d.ellipse((c - 6, c + 10, c + 6, c + 22), fill=B)
+    elif extra == "freckles":
+        for x, y in ((-48, 12), (-40, 20), (-54, 24), (40, 12), (48, 20), (54, 26), (-44, 30), (44, 32)):
+            d.ellipse((c + x - 3, c + y - 3, c + x + 3, c + y + 3), fill=B)
+    elif extra == "bowtie":
+        by = c + 78
+        d.polygon([(c, by), (c - 34, by - 16), (c - 34, by + 16)], fill=B)
+        d.polygon([(c, by), (c + 34, by - 16), (c + 34, by + 16)], fill=B)
+        d.ellipse((c - 8, by - 8, c + 8, by + 8), outline=W, width=3, fill=B)
+    elif extra == "mask":  # masque de super-héros
+        d.polygon([(c - 60, c - 24), (c - 8, c - 18), (c, c - 2), (c + 8, c - 18), (c + 60, c - 24),
+                   (c + 56, c + 12), (c + 10, c + 10), (c, c + 2), (c - 10, c + 10), (c - 56, c + 12)], fill=B)
+        d.ellipse((c - 40, c - 14, c - 16, c + 2), fill=W)
+        d.ellipse((c + 16, c - 14, c + 40, c + 2), fill=W)
+    elif extra == "sweat":
+        d.polygon([(c + 60, c - 36), (c + 70, c - 10), (c + 50, c - 10)], fill=B)
+        d.ellipse((c + 50, c - 20, c + 70, c + 0), fill=B)
+    elif extra == "star":  # étoile filante
+        pts = []
+        sx, sy = c + 76, c - 76
+        for i in range(10):
+            r = 18 if i % 2 == 0 else 7
+            a = -math.pi / 2 + i * math.pi / 5
+            pts.append((sx + r * math.cos(a), sy + r * math.sin(a)))
+        d.polygon(pts, fill=B)
+        d.line((sx - 20, sy + 10, sx - 50, sy + 30), fill=B, width=4)
+    elif extra == "phone":
+        d.rounded_rectangle((c + 56, c + 20, c + 92, c + 86), radius=6, outline=B, width=5, fill=W)
+        d.rectangle((c + 62, c + 30, c + 86, c + 70), fill=B)
+    elif extra == "scarf_plain":
+        d.rounded_rectangle((c - 62, c + 54, c + 62, c + 80), radius=10, fill=B)
+        d.rectangle((c - 48, c + 70, c - 20, c + 100), fill=B)
     return im
 
 
@@ -407,9 +523,57 @@ def sheet_list(title, items, filename, cols=5):
     print("planche :", HERE / filename)
 
 
+CAM3 = [
+    ("rire",            dict(hair="long", eyes="happy", mouth="laugh")),
+    ("yeux en cœur",    dict(hair="long", eyes="hearts", mouth="smile")),
+    ("étoiles",         dict(hair="long", eyes="stars", mouth="o")),
+    ("grognon",         dict(hair="long", eyes="angry", mouth="neutral")),
+    ("perplexe",        dict(hair="long", eyes="raised", mouth="wavy")),
+    ("triste",          dict(hair="long", eyes="open", mouth="sad", extra="tear")),
+    ("sifflote",        dict(hair="long", eyes="closed", mouth="whistle")),
+    ("taches de rousseur", dict(hair="long", eyes="open", mouth="smile", extra="freckles")),
+    ("en retard",       dict(hair="long", eyes="wide", mouth="o", extra="sweat")),
+    ("fête",            dict(hair="long", eyes="happy", mouth="laugh", hat="party")),
+    ("reine",           dict(hair="long", eyes="open", mouth="smirk", hat="crown")),
+    ("bandana",         dict(hair="long", eyes="open", mouth="grin", hat="bandana")),
+    ("pirate",          dict(hair="long", eyes="patch", mouth="grin", hat="pirate")),
+    ("ange",            dict(hair="long", eyes="closed", mouth="smile", hat="halo")),
+    ("diablotine",      dict(hair="long", eyes="angry", mouth="grin", hat="horns")),
+    ("super-héroïne",   dict(hair="long", eyes="open", mouth="smirk", extra="mask")),
+    ("au téléphone",    dict(hair="long", eyes="open", mouth="smile", extra="phone")),
+    ("étoile filante",  dict(hair="long", eyes="closed", mouth="smile", extra="star")),
+]
+
+OLIV3 = [
+    ("rire",            dict(hair="short", eyes="happy", mouth="laugh", glasses="round")),
+    ("yeux en cœur",    dict(hair="short", eyes="hearts", mouth="smile")),
+    ("étoiles",         dict(hair="short", eyes="stars", mouth="o")),
+    ("grognon",         dict(hair="short", eyes="angry", mouth="neutral", glasses="round")),
+    ("perplexe",        dict(hair="short", eyes="raised", mouth="wavy", glasses="round")),
+    ("sifflote",        dict(hair="short", eyes="closed", mouth="whistle", glasses="round")),
+    ("moustache",       dict(hair="short", eyes="open", mouth="smile", glasses="round", extra="mustache")),
+    ("nœud papillon",   dict(hair="short", eyes="open", mouth="smile", glasses="round", extra="bowtie")),
+    ("en retard",       dict(hair="short", eyes="wide", mouth="o", glasses="round", extra="sweat")),
+    ("fête",            dict(hair="short", eyes="happy", mouth="laugh", glasses="round", hat="party")),
+    ("roi",             dict(hair="short", eyes="open", mouth="smirk", glasses="round", hat="crown")),
+    ("bandana",         dict(hair="short", eyes="open", mouth="grin", glasses="round", hat="bandana")),
+    ("pirate",          dict(hair="short", eyes="patch", mouth="grin", hat="pirate", beard=True)),
+    ("chef",            dict(hair="short", eyes="open", mouth="smile", glasses="round", hat="chef", extra="mustache")),
+    ("ange",            dict(hair="short", eyes="closed", mouth="smile", glasses="round", hat="halo")),
+    ("diablotin",       dict(hair="short", eyes="angry", mouth="grin", glasses="round", hat="horns")),
+    ("super-héros",     dict(hair="short", eyes="open", mouth="smirk", extra="mask")),
+    ("diplômé",         dict(hair="short", eyes="open", mouth="smile", glasses="round", hat="graduate")),
+]
+
+
 def sheet_petard():
     sheet_list("Olivier — cheveux en pétard", PETARD, "variations_petard.png")
     sheet_list("Camille — série 2", CAM2, "variations_camille2.png", cols=6)
+
+
+def sheet_serie3():
+    sheet_list("Camille — série 3", CAM3, "variations_camille3.png", cols=6)
+    sheet_list("Olivier — série 3", OLIV3, "variations_olivier3.png", cols=6)
 
 
 def sheet():
@@ -463,5 +627,7 @@ if __name__ == "__main__":
         build(SELECTION)
     elif cmd == "petard":
         sheet_petard()
+    elif cmd == "serie3":
+        sheet_serie3()
     else:
         sheet()
