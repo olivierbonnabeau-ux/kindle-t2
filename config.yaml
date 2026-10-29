@@ -25,9 +25,11 @@ timezone: "Europe/Paris"
 # souvent que min_regen_s, quelle que soit la fréquence des requêtes.
 schedule:
   min_regen_s: 30
-  active:   { start: "06:00", end: "10:00", refresh_s: 60 }    # heures de pointe
+  active:   { start: "05:30", end: "10:00", refresh_s: 60 }    # heures de pointe (premier T2 vers 5h30)
   normal:   { refresh_s: 300 }                                  # le reste de la journée
-  night:    { start: "23:00", end: "06:00", refresh_s: 1800 }  # écran nuit, pas d'appel API
+  # Écran nuit (pas d'appel API) : après le dernier T2 (~0h30 en semaine, ~1h30 les nuits
+  # de vendredi et samedi → start_weekend s'applique aux nuits qui précèdent samedi et dimanche).
+  night:    { start: "00:50", start_weekend: "01:50", end: "05:30", refresh_s: 1800 }
 
 prim:
   cache_s: 30

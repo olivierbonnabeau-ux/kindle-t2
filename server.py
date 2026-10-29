@@ -70,8 +70,13 @@ def current_mode(now: datetime) -> tuple[str, int]:
     """→ ("night"|"active"|"normal", refresh_s)"""
     t = now.time()
     night = SCHED.get("night")
-    if night and _in_window(t, night["start"], night["end"]):
-        return "night", int(night.get("refresh_s", 1800))
+    if night:
+        # Nuits de vendredi→samedi et samedi→dimanche : dernier tram plus tard (start_weekend).
+        start = night["start"]
+        if now.weekday() in (5, 6) and night.get("start_weekend"):
+            start = night["start_weekend"]
+        if _in_window(t, start, night["end"]):
+            return "night", int(night.get("refresh_s", 1800))
     active = SCHED.get("active")
     if active and _in_window(t, active["start"], active["end"]):
         return "active", int(active.get("refresh_s", 60))

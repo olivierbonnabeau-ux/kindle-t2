@@ -53,8 +53,9 @@ L'image n'est jamais régénérée plus d'une fois toutes les 30 s (`schedule.mi
 l'API PRIM pas plus d'une fois toutes les 30 s (`prim.cache_s`). Si PRIM tombe,
 la dernière réponse valide reste affichée avec « Données indisponibles ».
 
-Plages horaires (`config.yaml` → `schedule`) : 6h–10h rafraîchissement conseillé 60 s,
-reste de la journée 5 min, 23h–6h écran « nuit » (heure + lune, aucun appel API).
+Plages horaires (`config.yaml` → `schedule`) : 5h30–10h rafraîchissement conseillé 60 s,
+reste de la journée 5 min, écran « nuit » (heure + lune, aucun appel API) de 0h50 à 5h30,
+de 1h50 à 5h30 les nuits de vendredi et samedi (dernier T2 ~0h30, ~1h30 le week-end).
 Le délai conseillé est renvoyé dans l'en-tête HTTP `X-Refresh-Seconds`.
 
 ## 4 bis. Hébergement cloud (Render) — la solution en service
@@ -109,8 +110,9 @@ netsh advfirewall firewall add rule name="Kindle T2" dir=in action=allow protoco
 Affichage par **kindle-dash**, fork Paperwhite [pusi77/kindle-dash-pw3](https://github.com/pusi77/kindle-dash-pw3)
 (même plateforme Wario que le PW2). Installé dans `/mnt/us/dashboard` avec nos réglages depuis `kindle/` :
 
-- `kindle/dashboard/local/env.sh` : URL de l'image (Render), toutes les 10 min de 6h à 22h50, **toutes les minutes de 6h à 9h59**
-  (`PEAK_SCHEDULE`, combiné par le wrapper `kindle/dashboard/next-wakeup`), écran nuit ensuite.
+- `kindle/dashboard/local/env.sh` : URL de l'image (Render) et horaires de réveil : **toutes les minutes de 5h30 à 9h59**,
+  toutes les 10 min jusqu'à 0h50 (1h50 les nuits de vendredi et samedi), puis écran nuit jusqu'à 5h30.
+  Plusieurs expressions cron (`EXTRA_SCHEDULES`) combinées par le wrapper `kindle/dashboard/next-wakeup`.
 - `kindle/dashboard/local/fetch-dashboard.sh` : curl avec délais larges ; si le magasin de certificats du Kindle
   refuse le certificat, second essai avec `kindle/dashboard/cacert.pem` (bundle Mozilla, vérification TLS conservée).
 - `kindle/documents/*.sh` : scriptlets visibles comme des livres dans la bibliothèque.
@@ -120,6 +122,7 @@ Utilisation :
 
 - **« Tableau de bord T2 - Test »** : une seule récupération + affichage, l'interface Kindle reste. Log : `dashboard/logs/test.log`.
 - **« Tableau de bord T2 - Démarrer »** : lance la boucle (interface Kindle coupée, veille profonde entre deux réveils). Log : `dashboard/logs/dash.log`, batterie : `dashboard/battery.log`.
+- Changer les horaires de réveil ou l'écran nuit = modifier `kindle/`, puis `kindle/copier_dashboard.ps1` avec le Kindle en USB.
 - **Arrêter** : maintenir le bouton d'allumage ~40 s (redémarrage, rien ne se relance tout seul), ou créer un fichier `dashboard/STOP`.
 - Brancher sur un **chargeur mural** (pas un PC : le mode USB coupe la boucle) : branché, le Kindle ne se met pas en veille et garde le Wi-Fi, idéal au mur.
 - Le serveur doit être joignable sur `http://192.168.1.6:8080/kindle.png` : Python est autorisé dans le pare-feu (profil privé).

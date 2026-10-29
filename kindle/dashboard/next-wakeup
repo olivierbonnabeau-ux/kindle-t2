@@ -1,22 +1,27 @@
 #!/bin/sh
 # Wrapper autour du binaire next-wakeup de kindle-dash (renommé next-wakeup.bin).
 # dash.sh l'appelle ainsi : next-wakeup --schedule="..." --timezone="Europe/Paris"
-# On calcule le prochain réveil pour deux horaires et on garde le plus proche :
-#   PEAK_SCHEDULE (heures de pointe, toutes les minutes) et REFRESH_SCHEDULE (le reste).
+# On calcule le prochain réveil pour chaque horaire (celui passé en argument + EXTRA_SCHEDULES,
+# séparés par ";") et on renvoie le plus proche.
 DIR="$(dirname "$0")"
 TZ_OPT="--timezone=Europe/Paris"
-SCHED_OPT=""
+SCHED=""
 for a in "$@"; do
   case "$a" in
     --timezone=*) TZ_OPT="$a" ;;
-    --schedule=*) SCHED_OPT="$a" ;;
+    --schedule=*) SCHED="${a#--schedule=}" ;;
   esac
 done
-SLOW="${REFRESH_SCHEDULE:-${SCHED_OPT#--schedule=}}"
-FAST="${PEAK_SCHEDULE:-$SLOW}"
-a=$("$DIR/next-wakeup.bin" --schedule="$FAST" "$TZ_OPT" 2>/dev/null)
-b=$("$DIR/next-wakeup.bin" --schedule="$SLOW" "$TZ_OPT" 2>/dev/null)
-[ -z "$a" ] && a=$b
-[ -z "$b" ] && b=$a
-if [ -z "$a" ]; then echo 600; exit 0; fi
-if [ "$a" -lt "$b" ]; then echo "$a"; else echo "$b"; fi
+ALL="$SCHED"
+[ -n "$EXTRA_SCHEDULES" ] && ALL="$ALL;$EXTRA_SCHEDULES"
+best=""
+IFS=';'
+for s in $ALL; do
+  [ -z "$s" ] && continue
+  v=$("$DIR/next-wakeup.bin" --schedule="$s" "$TZ_OPT" 2>/dev/null)
+  case $v in '' | *[!0-9]*) continue ;; esac
+  if [ -z "$best" ] || [ "$v" -lt "$best" ]; then best=$v; fi
+done
+unset IFS
+[ -z "$best" ] && best=600
+echo "$best"
