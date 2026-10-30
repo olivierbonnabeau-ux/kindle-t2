@@ -142,6 +142,63 @@ def _wrap(draw, text: str, f, max_w: int, max_lines: int = 2) -> list[str]:
     return lines
 
 
+# ---------------------------------------------------------------- bloc partagé
+def _draw_shared(d, img, plans, departures, now, cfg, people_cfg, weather,
+                 W, margin, top, bottom, theoretical):
+    """Même temps de trajet pour tout le monde : les têtes côte à côte, un seul
+    gros « partir dans X min », le tram visé et le tram suivant."""
+    plan = plans[0]
+    cx = W // 2
+    seed = plan.target_tram.isoformat() if plan.target_tram else now.strftime("%Y-%m-%d")
+
+    # têtes côte à côte, prénom sous chacune
+    size, gap = 175, 80
+    total = len(plans) * size + (len(plans) - 1) * gap
+    x = cx - total // 2
+    for p in plans:
+        pkey = people_cfg.get(p.name, {}).get("key", p.name.lower())
+        img.paste(load_picto(pick_picto(pkey, seed, weather), size, p.name[:1]), (x, top))
+        d.text((x + size // 2, top + size + 12), p.name, fill=BLACK, font=font(34, bold=True), anchor="mt")
+        x += size + gap
+
+    # gros chiffre
+    big_y = top + 288
+    if plan.leave_in_min is None:
+        d.text((cx, big_y), "—", fill=GREY, font=font(120, bold=True), anchor="mt")
+    elif plan.leave_now:
+        f = font(84, bold=True)
+        l, t, r, b = d.textbbox((cx, big_y + 20), "Maintenant !", font=f, anchor="mt")
+        d.rounded_rectangle((l - 24, t - 14, r + 24, b + 14), radius=18, fill=BLACK)
+        d.text((cx, big_y + 20), "Maintenant !", fill=WHITE, font=f, anchor="mt")
+    else:
+        f_lbl = font(30)
+        d.text((cx, big_y - 42), "partir dans", fill=DARK, font=f_lbl, anchor="mt")
+        f_num, f_min = font(140, bold=True), font(52)
+        num = str(plan.leave_in_min)
+        w_num, w_min = _text_w(d, num, f_num), _text_w(d, " min", f_min)
+        x = cx - (w_num + w_min) // 2
+        d.text((x, big_y), num, fill=BLACK, font=f_num, anchor="lt")
+        l, t, r, b = d.textbbox((x, big_y), num, font=f_num, anchor="lt")
+        d.text((x + w_num, (t + b) // 2), " min", fill=BLACK, font=f_min, anchor="lm")
+
+    # tram visé, trajet, tram suivant
+    y = top + 440
+    tram = plan.target_tram.strftime("%H:%M") if plan.target_tram else "--:--"
+    d.text((cx, y), f"tram {tram}", fill=BLACK, font=font(36, bold=True), anchor="mt")
+    walk = f"{plan.walk_min} min à pied"
+    if plan.margin_min:
+        walk += f"  +  {plan.margin_min} min de marge"
+    d.text((cx, y + 50), walk, fill=DARK, font=font(24), anchor="mt")
+    following = [t for t in sorted(departures) if plan.target_tram and t > plan.target_tram]
+    if following:
+        nxt = following[0]
+        leave = nxt - timedelta(minutes=plan.walk_min + plan.margin_min)
+        wait = max(int((leave - now).total_seconds() // 60), 0)
+        theo = " (théo.)" if nxt in theoretical else ""
+        d.text((cx, y + 88), f"sinon tram {nxt:%H:%M}{theo} → partir dans {wait} min",
+               fill=GREY, font=font(22), anchor="mt")
+
+
 # ---------------------------------------------------------------- écran principal
 def render_screen(plans, departures, traffic, now: datetime, cfg: dict,
                   stale: bool = False, weather: str | None = None,
@@ -164,12 +221,18 @@ def render_screen(plans, departures, traffic, now: datetime, cfg: dict,
     d.text((margin, 84), date_fr(now), fill=DARK, font=font(24))
     d.line((margin, 124, W - margin, 124), fill=BLACK, width=3)
 
-    # --- deux colonnes
+    # --- bloc central : un seul compte à rebours si tout le monde a le même
+    # temps de trajet (sinon une colonne par personne)
     col_top, col_bottom = 150, 700
-    col_w = (W - 2 * margin) // 2
-    d.line((W // 2, col_top, W // 2, col_bottom), fill=GREY, width=2)
     people_cfg = {p["name"]: p for p in cfg["people"]}
-    for i, plan in enumerate(plans):
+    shared = len(plans) > 1 and len({(p.walk_min, p.margin_min) for p in plans}) == 1
+    if shared:
+        _draw_shared(d, img, plans, departures, now, cfg, people_cfg, weather,
+                     W, margin, col_top, col_bottom, theoretical)
+    col_w = (W - 2 * margin) // 2
+    if not shared:
+        d.line((W // 2, col_top, W // 2, col_bottom), fill=GREY, width=2)
+    for i, plan in enumerate([] if shared else plans):
         x0 = margin + i * col_w
         cx = x0 + col_w // 2
         pkey = people_cfg.get(plan.name, {}).get("key", plan.name.lower())
@@ -195,7 +258,8 @@ def render_screen(plans, departures, traffic, now: datetime, cfg: dict,
             w_num, w_min = _text_w(d, num, f_num), _text_w(d, " min", f_min)
             x = cx - (w_num + w_min) // 2
             d.text((x, big_y), num, fill=BLACK, font=f_num, anchor="lt")
-            d.text((x + w_num, big_y + 58), " min", fill=BLACK, font=f_min, anchor="lt")
+            l, t, r, b = d.textbbox((x, big_y), num, font=f_num, anchor="lt")
+            d.text((x + w_num, (t + b) // 2), " min", fill=BLACK, font=f_min, anchor="lm")
 
         y = col_top + 445
         tram = plan.target_tram.strftime("%H:%M") if plan.target_tram else "--:--"
@@ -281,11 +345,16 @@ def render_night(now: datetime, cfg: dict, next_active: str = "06:00",
         d.text((cx, y + 70), first_tram.strftime("%H:%M"), fill=BLACK, font=font(96, bold=True), anchor="mt")
         d.text((cx, y + 190), f"→ {stop['destination']}", fill=DARK, font=font(24), anchor="mt")
         # heure de départ de chacun pour l'attraper
-        parts = []
+        leaves = {}
         for p in cfg.get("people", []):
             leave = first_tram - timedelta(minutes=int(p["walk_min"]) + int(p.get("margin_min", 0)))
-            parts.append(f"{p['name']} part à {leave:%H:%M}")
-        d.text((cx, y + 240), "  ·  ".join(parts), fill=BLACK, font=font(30, bold=True), anchor="mt")
+            leaves.setdefault(leave, []).append(p["name"])
+        if len(leaves) == 1:   # même temps de trajet pour tout le monde
+            (leave, names), = leaves.items()
+            txt = " et ".join(names) + f" partent à {leave:%H:%M}"
+        else:
+            txt = "  ·  ".join(f"{', '.join(n)} part à {t:%H:%M}" for t, n in sorted(leaves.items()))
+        d.text((cx, y + 240), txt, fill=BLACK, font=font(30, bold=True), anchor="mt")
     else:
         d.text((cx, y + 40), f"Horaires à partir de {next_active}", fill=DARK, font=font(32), anchor="mt")
     d.text((cx, H - 50), "Bonne nuit", fill=GREY, font=font(24), anchor="mm")
