@@ -13,7 +13,7 @@ stop:
 people:
   - name: "Cam"
     key: "cam"            # sous-dossier dans ./pictos/
-    walk_min: 5
+    walk_min: 6
     margin_min: 1
   - name: "Oliv"
     key: "oliv"
