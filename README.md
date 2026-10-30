@@ -141,10 +141,10 @@ Un picto différent est choisi chaque jour. Si un nom de fichier contient un mot
 
 | Fichier | Rôle |
 |---|---|
-| `config.yaml` | ids arrêt/ligne, personnes (marche, marge), plages horaires, port |
+| `config.yaml` | ids arrêt/ligne, personnes (marche 5 min + marge 1 min pour les deux), plages horaires, port |
 | `prim_client.py` | appels PRIM (stop-monitoring + general-message), cache 30 s, repli sur dernière réponse |
 | `logic.py` | calcul « partir dans X min » / « Maintenant ! » |
-| `render.py` | image 758×1024 niveaux de gris (`python render.py` → `preview.png` avec données simulées) |
+| `render.py` | image 758×1024 niveaux de gris : un seul compte à rebours quand tout le monde a le même temps de trajet, sinon une colonne par personne (`python render.py` → `preview.png` avec données simulées) |
 | `server.py` | Flask : `/kindle.png`, `/`, `/health` |
 | `test_prim.py` | test de la clé et de l'arrêt |
 | `find_ids.py` | recherche des ids dans l'open data IDFM |

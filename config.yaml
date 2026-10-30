@@ -13,11 +13,11 @@ stop:
 people:
   - name: "Cam"
     key: "cam"            # sous-dossier dans ./pictos/
-    walk_min: 9
+    walk_min: 5
     margin_min: 1
   - name: "Oliv"
     key: "oliv"
-    walk_min: 6
+    walk_min: 5
     margin_min: 1
 
 timezone: "Europe/Paris"
