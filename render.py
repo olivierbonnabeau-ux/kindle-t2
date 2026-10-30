@@ -178,7 +178,8 @@ def _draw_shared(d, img, plans, departures, now, cfg, people_cfg, weather,
         w_num, w_min = _text_w(d, num, f_num), _text_w(d, " min", f_min)
         x = cx - (w_num + w_min) // 2
         d.text((x, big_y), num, fill=BLACK, font=f_num, anchor="lt")
-        d.text((x + w_num, big_y + 76), " min", fill=BLACK, font=f_min, anchor="lt")
+        l, t, r, b = d.textbbox((x, big_y), num, font=f_num, anchor="lt")
+        d.text((x + w_num, (t + b) // 2), " min", fill=BLACK, font=f_min, anchor="lm")
 
     # tram visé, trajet, tram suivant
     y = top + 440
@@ -257,7 +258,8 @@ def render_screen(plans, departures, traffic, now: datetime, cfg: dict,
             w_num, w_min = _text_w(d, num, f_num), _text_w(d, " min", f_min)
             x = cx - (w_num + w_min) // 2
             d.text((x, big_y), num, fill=BLACK, font=f_num, anchor="lt")
-            d.text((x + w_num, big_y + 58), " min", fill=BLACK, font=f_min, anchor="lt")
+            l, t, r, b = d.textbbox((x, big_y), num, font=f_num, anchor="lt")
+            d.text((x + w_num, (t + b) // 2), " min", fill=BLACK, font=f_min, anchor="lm")
 
         y = col_top + 445
         tram = plan.target_tram.strftime("%H:%M") if plan.target_tram else "--:--"
