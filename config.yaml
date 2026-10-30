@@ -33,21 +33,23 @@ schedule:
   night:    { start: "00:50", start_weekend: "01:50", end: "05:30", refresh_s: 1800 }
 
 prim:
-  # QUOTAS PRIM : 1 000 appels / jour / API (temps réel, info trafic, Navitia), remise à zéro vers 1h.
-  # Budget visé ≈ 700 / 150 / 50 par jour.
+  # QUOTAS PRIM (clé d'Olivier, relevés le 30/10/2026 après augmentation sur le portail) :
+  #   temps réel 1 000 000 / jour (100 / s), info trafic 20 000 / jour, Navitia 20 000 / jour.
+  #   Les nouvelles clés n'ont que 1 000 / jour par défaut → demander l'augmentation sur
+  #   prim.iledefrance-mobilites.fr → Mon suivi de consommation. Pause automatique sur 429.
   timeout_s: 10
   max_departures: 8
-  # Temps réel (stop-monitoring) : un appel par quai principal, cadence selon l'heure.
-  cache_s: 150                 # hors pointe : un appel toutes les 2,5 min  (~360 / jour)
-  cache_peak_s: 60             # heures de pointe (schedule.active) : toutes les 60 s (~270 / jour)
-  secondary_interval_s: 900    # second quai : toutes les 15 min (~80 / jour)
+  # Temps réel (stop-monitoring) : un appel par quai, PRIM ne rafraîchit pas plus vite que ~30 s.
+  cache_s: 30                  # ~2 300 appels / jour par quai
+  cache_peak_s: 30
+  secondary_interval_s: 120    # second quai (jamais vu actif) : toutes les 2 min
   # Info trafic (general-message)
-  traffic_cache_s: 600         # toutes les 10 min (~150 / jour)
+  traffic_cache_s: 120         # ~600 / jour
   # Horaires théoriques (Navitia) : complètent les 2 passages temps réel, et servent de repli
-  # quand le temps réel est indisponible (quota épuisé, panne).
+  # quand le temps réel est indisponible.
   navitia_stop_points: ["stop_point:IDFM:23445"]
   navitia_count: 12
-  navitia_cache_s: 1800        # toutes les 30 min (~50 / jour)
+  navitia_cache_s: 600         # ~120 / jour
 
 server:
   host: "0.0.0.0"

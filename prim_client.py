@@ -213,13 +213,14 @@ class PrimClient:
         return self.parse_stop_monitoring(r.json(), stop_point_id)
 
     def _note_rate_limit(self, r: requests.Response) -> None:
-        """429 : on respecte Retry-After (quota journalier, remise à zéro vers 1h)."""
+        """429 : on respecte Retry-After, plafonné à 15 min (le quota peut être relevé sur le
+        portail à tout moment : on re-sonde régulièrement plutôt que d'attendre minuit)."""
         if r.status_code == 429:
             try:
-                wait = float(r.headers.get("retry-after") or r.headers.get("ratelimit-reset") or 900)
+                wait = float(r.headers.get("retry-after") or r.headers.get("ratelimit-reset") or 300)
             except ValueError:
-                wait = 900
-            self._rt_blocked_until = time.monotonic() + min(wait, 24 * 3600)
+                wait = 300
+            self._rt_blocked_until = time.monotonic() + max(5.0, min(wait, 900))
 
 
     def parse_stop_monitoring(self, payload: dict, stop_point_id: str = "") -> list[Departure]:
