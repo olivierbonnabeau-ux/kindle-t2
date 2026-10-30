@@ -229,7 +229,14 @@ def render_screen(plans, departures, traffic, now: datetime, cfg: dict,
     d.line((margin, y, W - margin, y), fill=GREY, width=2)
     y += 14
     if stale:
-        status, msg = "⚠ Données indisponibles", "dernière réponse de l'API affichée"
+        if nexts:
+            status = "Temps réel indisponible"
+            msg = ("horaires théoriques affichés" if all(t in theoretical for t in nexts)
+                   else "derniers passages connus + horaires théoriques")
+            if traffic is not None and traffic.disrupted:
+                msg += " · trafic perturbé : " + traffic.message
+        else:
+            status, msg = "Données indisponibles", "aucun passage connu pour le moment"
     elif traffic is not None and traffic.disrupted:
         status, msg = "Trafic perturbé", traffic.message
     else:

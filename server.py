@@ -103,13 +103,15 @@ def build_image(now: datetime) -> tuple[bytes, dict]:
         img = render.render_screen(plans, [], TrafficResult(), now, cfg, stale=True)
         info.update(stale=True, error=_client_error)
     else:
-        res = client.get_departures()
+        res = client.get_departures(peak=(mode == "active"))
         traffic = client.get_traffic()
         plans = compute_all(cfg["people"], res.times, now, int(cfg.get("render", {}).get("next_departures", 4)))
         img = render.render_screen(plans, res.times, traffic, now, cfg, stale=res.stale,
                                    theoretical=res.theoretical_times)
         info.update(stale=res.stale, error=res.error, n_departures=len(res.departures),
-                    fetched_at=res.fetched_at.isoformat() if res.fetched_at else None)
+                    n_theoretical=len(res.theoretical_times),
+                    fetched_at=res.fetched_at.isoformat() if res.fetched_at else None,
+                    api_calls=dict(client.calls))
         if res.stale:
             log.warning("API PRIM indisponible : %s", res.error)
     buf = io.BytesIO()
@@ -150,6 +152,8 @@ def health():
         "stale": info.get("stale"),
         "error": info.get("error"),
         "n_departures": info.get("n_departures"),
+        "n_theoretical": info.get("n_theoretical"),
+        "api_calls_since_start": info.get("api_calls"),
         "image_age_s": round((now - gen).total_seconds(), 1) if gen else None,
         "fetched_at": info.get("fetched_at"),
         "now": now.isoformat(),

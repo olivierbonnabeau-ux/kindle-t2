@@ -4,7 +4,8 @@ stop:
   name: "Pont de Bezons"
   # Identifiants trouvés via l'open data IDFM (dataset arrets-lignes).
   # Le terminus a deux quais ; on interroge les deux et on fusionne.
-  stop_point_ids: ["23445", "25647"]        # → MonitoringRef=STIF:StopPoint:Q:<id>:
+  stop_point_ids: ["23445"]                 # → MonitoringRef=STIF:StopPoint:Q:<id>: (quai principal)
+  secondary_stop_point_ids: ["25647"]       # second quai, jamais vu actif : interrogé rarement
   line_id: "C01390"                          # T2 → LineRef=STIF:Line::C01390:
   line_name: "T2"
   destination: "Porte de Versailles"
@@ -32,14 +33,21 @@ schedule:
   night:    { start: "00:50", start_weekend: "01:50", end: "05:30", refresh_s: 1800 }
 
 prim:
-  cache_s: 30
+  # QUOTAS PRIM : 1 000 appels / jour / API (temps réel, info trafic, Navitia), remise à zéro vers 1h.
+  # Budget visé ≈ 700 / 150 / 50 par jour.
   timeout_s: 10
   max_departures: 8
-  # L'API temps réel ne renvoie que 2 passages par quai : on complète avec les horaires
-  # théoriques de l'API Navitia de PRIM (même clé) → 2 réels puis les 2 théoriques suivants.
-  navitia_stop_points: ["stop_point:IDFM:23445", "stop_point:IDFM:25647"]
-  navitia_count: 8
-  navitia_cache_s: 120
+  # Temps réel (stop-monitoring) : un appel par quai principal, cadence selon l'heure.
+  cache_s: 150                 # hors pointe : un appel toutes les 2,5 min  (~360 / jour)
+  cache_peak_s: 60             # heures de pointe (schedule.active) : toutes les 60 s (~270 / jour)
+  secondary_interval_s: 900    # second quai : toutes les 15 min (~80 / jour)
+  # Info trafic (general-message)
+  traffic_cache_s: 600         # toutes les 10 min (~150 / jour)
+  # Horaires théoriques (Navitia) : complètent les 2 passages temps réel, et servent de repli
+  # quand le temps réel est indisponible (quota épuisé, panne).
+  navitia_stop_points: ["stop_point:IDFM:23445"]
+  navitia_count: 12
+  navitia_cache_s: 1800        # toutes les 30 min (~50 / jour)
 
 server:
   host: "0.0.0.0"

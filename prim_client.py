@@ -117,44 +117,62 @@ class PrimClient:
         self.cache_s = float(prim.get("cache_s", 30))
         self.timeout_s = float(prim.get("timeout_s", 10))
         self.max_departures = int(prim.get("max_departures", 8))
+        self.cache_peak_s = float(prim.get("cache_peak_s", self.cache_s))
+        self.secondary_interval_s = float(prim.get("secondary_interval_s", 900))
+        self.traffic_cache_s = float(prim.get("traffic_cache_s", 600))
         self.navitia_stop_points: list[str] = [str(s) for s in prim.get("navitia_stop_points", [])]
         self.navitia_count = int(prim.get("navitia_count", 8))
-        self.navitia_cache_s = float(prim.get("navitia_cache_s", 120))
+        self.navitia_cache_s = float(prim.get("navitia_cache_s", 1800))
         self.tz = ZoneInfo(self.cfg.get("timezone", "Europe/Paris"))
 
         stop = self.cfg["stop"]
         self.stop_point_ids: list[str] = [str(s) for s in stop["stop_point_ids"]]
+        self.secondary_stop_point_ids: list[str] = [str(s) for s in stop.get("secondary_stop_point_ids", [])]
         self.line_ref = f"STIF:Line::{stop['line_id']}:"
 
         self._lock = threading.Lock()
         self._last: DeparturesResult = DeparturesResult()
         self._last_fetch_mono = 0.0
+        self._real: list[Departure] = []          # derniers passages temps réel valides
+        self._real_at: datetime | None = None
+        self._secondary: list[Departure] = []
+        self._secondary_fetch_mono = 0.0
+        self._rt_blocked_until = 0.0              # quota épuisé (429) : pas d'appel avant
         self._traffic: TrafficResult = TrafficResult()
         self._traffic_fetch_mono = 0.0
         self._theo: list[Departure] = []
         self._theo_fetch_mono = 0.0
         self.theo_error: str | None = None
+        self.calls = {"realtime": 0, "traffic": 0, "navitia": 0}   # compteur d'appels (diagnostic)
 
         self._session = requests.Session()
         self._session.headers.update({"apiKey": self.api_key, "Accept": "application/json"})
 
     # ------------------------------------------------------------------ départs
-    def get_departures(self, force: bool = False) -> DeparturesResult:
+    def get_departures(self, force: bool = False, peak: bool = False) -> DeparturesResult:
+        """Passages à venir : temps réel (rafraîchi toutes les cache_s, ou cache_peak_s en
+        pointe) complété par les horaires théoriques. Si le temps réel est indisponible
+        (quota 429, panne), on garde les derniers passages réels encore à venir, puis les
+        théoriques, et stale=True avec l'erreur."""
         with self._lock:
+            interval = self.cache_peak_s if peak else self.cache_s
             age = time.monotonic() - self._last_fetch_mono
-            if not force and self._last.fetched_at and age < self.cache_s:
+            if not force and self._last_fetch_mono and age < interval:
                 return self._last
-            try:
-                deps = self._fetch_all_departures()
-                deps = self._complete_with_theoretical(deps)
-                self._last = DeparturesResult(departures=deps, fetched_at=datetime.now(self.tz))
-            except Exception as e:  # réseau, HTTP, JSON…
-                self._last = DeparturesResult(
-                    departures=self._last.departures,
-                    fetched_at=self._last.fetched_at,
-                    stale=True,
-                    error=f"{type(e).__name__}: {e}",
-                )
+            error = None
+            if time.monotonic() < self._rt_blocked_until and not force:
+                error = f"quota temps réel épuisé, reprise dans {int((self._rt_blocked_until - time.monotonic()) / 60)} min"
+            else:
+                try:
+                    self._real = self._fetch_all_departures()
+                    self._real_at = datetime.now(self.tz)
+                except Exception as e:  # réseau, HTTP, JSON…
+                    error = f"{type(e).__name__}: {e}"
+            now = datetime.now(timezone.utc)
+            real = [d for d in self._real if d.expected >= now]
+            deps = self._complete_with_theoretical(real)
+            self._last = DeparturesResult(departures=deps, fetched_at=self._real_at,
+                                          stale=error is not None, error=error)
             self._last_fetch_mono = time.monotonic()
             return self._last
 
@@ -164,10 +182,19 @@ class PrimClient:
         for sp in self.stop_point_ids:
             try:
                 for d in self._fetch_stop_point(sp):
-                    key = (d.expected.isoformat(), d.destination)
-                    seen.setdefault(key, d)
+                    seen.setdefault((d.expected.isoformat(), d.destination), d)
             except Exception as e:
                 errors.append(f"{sp}: {type(e).__name__}: {e}")
+        # second quai : rarement interrogé (jamais vu actif), on réutilise sa dernière réponse
+        if self.secondary_stop_point_ids and not errors:
+            if time.monotonic() - self._secondary_fetch_mono >= self.secondary_interval_s:
+                try:
+                    self._secondary = [d for sp in self.secondary_stop_point_ids for d in self._fetch_stop_point(sp)]
+                except Exception as e:
+                    errors.append(f"{self.secondary_stop_point_ids}: {type(e).__name__}: {e}")
+                self._secondary_fetch_mono = time.monotonic()
+            for d in self._secondary:
+                seen.setdefault((d.expected.isoformat(), d.destination), d)
         if not seen and errors:
             raise RuntimeError("; ".join(errors))
         now = datetime.now(timezone.utc)
@@ -175,13 +202,25 @@ class PrimClient:
         return deps[: self.max_departures]
 
     def _fetch_stop_point(self, stop_point_id: str) -> list[Departure]:
+        self.calls["realtime"] += 1
         r = self._session.get(
             STOP_MONITORING_URL,
             params={"MonitoringRef": f"STIF:StopPoint:Q:{stop_point_id}:"},
             timeout=self.timeout_s,
         )
+        self._note_rate_limit(r)
         r.raise_for_status()
         return self.parse_stop_monitoring(r.json(), stop_point_id)
+
+    def _note_rate_limit(self, r: requests.Response) -> None:
+        """429 : on respecte Retry-After (quota journalier, remise à zéro vers 1h)."""
+        if r.status_code == 429:
+            try:
+                wait = float(r.headers.get("retry-after") or r.headers.get("ratelimit-reset") or 900)
+            except ValueError:
+                wait = 900
+            self._rt_blocked_until = time.monotonic() + min(wait, 24 * 3600)
+
 
     def parse_stop_monitoring(self, payload: dict, stop_point_id: str = "") -> list[Departure]:
         out: list[Departure] = []
@@ -263,6 +302,7 @@ class PrimClient:
         out: dict[str, Departure] = {}
         line_code = str(self.cfg["stop"].get("line_name", ""))
         for sp in self.navitia_stop_points:
+            self.calls["navitia"] += 1
             r = self._session.get(
                 f"{NAVITIA_URL}/stop_points/{sp}/departures",
                 params={"count": self.navitia_count, "data_freshness": "base_schedule",
@@ -284,7 +324,8 @@ class PrimClient:
         return sorted(out.values(), key=lambda d: d.expected)
 
     # ------------------------------------------------------------------ trafic
-    def get_traffic(self, force: bool = False, cache_s: float = 120) -> TrafficResult:
+    def get_traffic(self, force: bool = False, cache_s: float | None = None) -> TrafficResult:
+        cache_s = self.traffic_cache_s if cache_s is None else cache_s
         with self._lock:
             age = time.monotonic() - self._traffic_fetch_mono
             if not force and self._traffic_fetch_mono and age < cache_s:
@@ -302,6 +343,7 @@ class PrimClient:
             return self._traffic
 
     def _fetch_traffic(self) -> TrafficResult:
+        self.calls["traffic"] += 1
         r = self._session.get(
             GENERAL_MESSAGE_URL, params={"LineRef": self.line_ref}, timeout=self.timeout_s
         )
